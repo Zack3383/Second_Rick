@@ -4,14 +4,21 @@ import os
 from dotenv import load_dotenv
 import youtube_dl
 import asyncio
+from pytube import YouTube
+
+print("Program Starting")
 
 load_dotenv()
 token = os.getenv("TOKEN")
+
+print("Token Got")
 
 intents = discord.Intents(messages = True, guilds = True, voice_states = True, typing = True)
 
 client = discord.Client(intents = intents)
 bot = commands.Bot(command_prefix='rick ',intents=intents)
+
+print("Bot Made")
 
 youtube_dl.utils.bug_reports_message = lambda: ''
 
@@ -33,6 +40,7 @@ ffmpeg_options = {
 }
 
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
+print("Downloader Made")
 
 class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
@@ -51,7 +59,7 @@ class YTDLSource(discord.PCMVolumeTransformer):
         filename = data['title'] if stream else ytdl.prepare_filename(data)
         return filename
 
-@bot.command(name = 'join', help="To make the bot join th channel")
+@bot.command(name = 'join', help="To make the bot join the channel")
 async def join(ctx):
     if not ctx.message.author.voice:
         await ctx.send("{} is not connected to a voice channel".format(ctx.message.author.name))
@@ -59,6 +67,11 @@ async def join(ctx):
     else:
         channel = ctx.message.author.voice.channel
     await channel.connect()
+
+@bot.command(name = 'ping', help="Making sure bot is online")
+async def ping(ctx):
+    await ctx.send("I am here, be not afraid")
+    return
 
 @bot.command(name='leave', help='To make the bot leave the voice channel')
 async def leave(ctx):
@@ -70,14 +83,20 @@ async def leave(ctx):
 
 
 @bot.command(name='play', help='To play song')
-async def play(ctx,url):
+async def play(ctx, url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"):
     try :
         server = ctx.message.guild
         voice_channel = server.voice_client
 
+        print("server and voice channel found")
+
+        yt = YouTube(url)
+        filename = "rick_roll.mp3"
+        yt.streams.get_audio_only().download(filename=filename)
+
         async with ctx.typing():
-            filename = await YTDLSource.from_url(url, loop=bot.loop)
-            voice_channel.play(discord.FFmpegPCMAudio(executable="ffmpeg.exe", source=filename))
+            print("async started")
+            voice_channel.play(discord.FFmpegPCMAudio(filename))
         await ctx.send('**Now playing:** {}'.format(filename))
     except:
         await ctx.send("The bot is not connected to a voice channel.")
