@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import youtube_dl
 import asyncio
 from pytube import YouTube
+from youtubesearchpython import VideosSearch
 
 print("Program Starting")
 
@@ -83,21 +84,31 @@ async def leave(ctx):
 
 
 @bot.command(name='play', help='To play song')
-async def play(ctx, url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"):
+async def play(ctx, *args):
+    name = ' '.join(args)
+
+    if name == '':
+        name = "Never Gonna Give You Up"
+
     try :
         server = ctx.message.guild
         voice_channel = server.voice_client
 
         print("server and voice channel found")
 
-        yt = YouTube(url)
-        filename = "rick_roll.mp3"
-        yt.streams.get_audio_only().download(filename=filename)
+        result = VideosSearch(name, limit = 1).result()
+        id = result['result'][0]['id']
+        title = result['result'][0]['title']
+        link = "https://www.youtube.com/watch?v=" + str(id)
+
+        yt = YouTube(link)
+        filename = "song_files/" + title + ".mp4"
+        yt.streams.get_audio_only().download('song_files')
 
         async with ctx.typing():
             print("async started")
             voice_channel.play(discord.FFmpegPCMAudio(filename))
-        await ctx.send('**Now playing:** {}'.format(filename))
+        await ctx.send('**Now playing:** {}'.format(title))
     except:
         await ctx.send("The bot is not connected to a voice channel.")
 
