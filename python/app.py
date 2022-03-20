@@ -2,7 +2,6 @@ import discord
 from discord.ext import commands,tasks
 import os
 from dotenv import load_dotenv
-import youtube_dl
 import asyncio
 from pytube import YouTube
 from youtubesearchpython import VideosSearch
@@ -12,7 +11,7 @@ print("Program Starting")
 load_dotenv()
 token = os.getenv("TOKEN")
 
-print("Token Got")
+queue = list()
 
 intents = discord.Intents(messages = True, guilds = True, voice_states = True, typing = True)
 
@@ -20,45 +19,6 @@ client = discord.Client(intents = intents)
 bot = commands.Bot(command_prefix='rick ',intents=intents)
 
 print("Bot Made")
-
-youtube_dl.utils.bug_reports_message = lambda: ''
-
-ytdl_format_options = {
-    'format': 'bestaudio/best',
-    'restrictfilenames': True,
-    'noplaylist': True,
-    'nocheckcertificate': True,
-    'ignoreerrors': False,
-    'logtostderr': False,
-    'quiet': True,
-    'no_warnings': True,
-    'default_search': 'auto',
-    'source_address': '0.0.0.0' # bind to ipv4 since ipv6 addresses cause issues sometimes
-}
-
-ffmpeg_options = {
-    'options': '-vn'
-}
-
-ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
-print("Downloader Made")
-
-class YTDLSource(discord.PCMVolumeTransformer):
-    def __init__(self, source, *, data, volume=0.5):
-        super().__init__(source, volume)
-        self.data = data
-        self.title = data.get('title')
-        self.url = ""
-
-    @classmethod
-    async def from_url(cls, url, *, loop=None, stream=False):
-        loop = loop or asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
-        if 'entries' in data:
-            # take first item from a playlist
-            data = data['entries'][0]
-        filename = data['title'] if stream else ytdl.prepare_filename(data)
-        return filename
 
 @bot.command(name = 'join', help="To make the bot join the channel")
 async def join(ctx):
@@ -94,23 +54,22 @@ async def play(ctx, *args):
         server = ctx.message.guild
         voice_channel = server.voice_client
 
-        print("server and voice channel found")
-
-        result = VideosSearch(name, limit = 1).result()
-        id = result['result'][0]['id']
-        title = result['result'][0]['title']
-        link = "https://www.youtube.com/watch?v=" + str(id)
-
-        yt = YouTube(link)
-        filename = "song_files/" + title + ".mp4"
-        yt.streams.get_audio_only().download('song_files')
-
+        (filename, title) = download_song(name)
+        queue.append((title, filename, True))
         async with ctx.typing():
-            print("async started")
-            voice_channel.play(discord.FFmpegPCMAudio(filename))
-        await ctx.send('**Now playing:** {}'.format(title))
+            while True:
+                next_song = queue.pop()
+                if(not next_song[2]):
+                    break
+                voice_channel.play(discord.FFmpegPCMAudio(next_song[1]))
+                await ctx.send('**Now playing:** {}'.format(title))
     except:
         await ctx.send("The bot is not connected to a voice channel.")
+
+# @bot.command(name='queue', help='Displays the current queue')
+# async def queue(ctx):
+#     str = ""
+#     for song in queue:
 
 
 @bot.command(name='pause', help='This command pauses the song')
@@ -136,6 +95,16 @@ async def stop(ctx):
         await voice_client.stop()
     else:
         await ctx.send("The bot is not playing anything at the moment.")
+
+def download_song(name):
+    result = VideosSearch(name, limit = 1).result()
+    id = result['result'][0]['id']
+    title = result['result'][0]['title']
+    link = "https://www.youtube.com/watch?v=" + str(id)
+
+    yt = YouTube(link)
+    yt.streams.get_audio_only().download('song_files')
+    return ("song_files/" + title + ".mp4", title)
 
 if __name__ == "__main__":
     bot.run(token)
